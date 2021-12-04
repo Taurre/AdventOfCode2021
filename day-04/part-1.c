@@ -14,9 +14,9 @@ board_is_winner(unsigned char (*grid)[5]) {
 		unsigned cc = 0, rc = 0;
 
 		for (size_t j = 0; j < 5; j++) {
-			if ((grid[i][j] & 0x80) == 0x80)
+			if ((grid[i][j] & 0x80))
 				cc++;
-			if ((grid[j][i] & 0x80) == 0x80)
+			if ((grid[j][i] & 0x80))
 				rc++;
 		}
 
@@ -98,7 +98,7 @@ main(int argc, char **argv) {
 			exit(EXIT_FAILURE);
 		}
 
-		while (fscanf(fp,
+		if (fscanf(fp,
 		           "%hhu %hhu %hhu %hhu %hhu"
 		           "%hhu %hhu %hhu %hhu %hhu"
 		           "%hhu %hhu %hhu %hhu %hhu"
@@ -109,19 +109,19 @@ main(int argc, char **argv) {
 		           &grid[2][0], &grid[2][1], &grid[2][2], &grid[2][3], &grid[2][4],
 		           &grid[3][0], &grid[3][1], &grid[3][2], &grid[3][3], &grid[3][4],
 		           &grid[4][0], &grid[4][1], &grid[4][2], &grid[4][3], &grid[4][4]
-		          ) == 25) {
-			if (!list_append(boards, grid)) {
-				perror("list_append");
+		          ) != 25) {
+			if (ferror(fp)) {
+				perror("fscanf");
 				exit(EXIT_FAILURE);
 			}
+
+			break;
 		}
 
-		if (ferror(fp)) {
-			perror("fscanf");
+		if (!list_append(boards, grid)) {
+			perror("list_append");
 			exit(EXIT_FAILURE);
 		}
-		else
-			break;
 	}
 
 	void *data;
@@ -150,14 +150,6 @@ main(int argc, char **argv) {
 	puts("No winner found");
 	return EXIT_FAILURE;
 end:
-	for (size_t i = 0; i < 5; i++) {
-		for (size_t j = 0; j < 5; j++)
-			printf("%u ", winner[i][j] & 0x7F);
-
-		putchar('\n');
-	}
-
-	printf("%ju\n", (uintmax_t)last_number);
 	printf("Score: %ju\n", score_compute(winner, last_number));
 	fclose(fp);
 	return 0;
