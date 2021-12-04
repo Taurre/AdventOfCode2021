@@ -1,57 +1,43 @@
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 
-#define NBITS 12
-#define LINES 1000
+#include "list.h"
 
-static uintmax_t
-find_rating(uint16_t numbers[], bool oxygen) {
-	uintmax_t min = 0;
-	uintmax_t max = (1 << NBITS) - 1;
-	uintmax_t treshold = 1 << (NBITS - 1);
-	uintmax_t res = 0;
+static bool
+board_is_winner(unsigned char (*grid)[5]) {
+	assert(grid != NULL);
 
-	for (uintmax_t i = 0; i < NBITS; i++) {
-		uintmax_t count = 0, higher = 0, last = 0;
+	for (size_t i = 0; i < 5; i++) {
+		unsigned cc = 0, rc = 0;
 
-		for (uintmax_t j = 0; j < LINES; j++) {
-			if (numbers[j] < min || numbers[j] > max)
-				continue;
-			if ((numbers[j] & treshold))
-				higher++;
-
-			last = numbers[j];
-			count++;
+		for (size_t j = 0; j < 5; j++) {
+			if ((grid[i][j] & 0x80))
+				cc++;
+			if ((grid[j][i] & 0x80))
+				rc++;
 		}
 
-		if (oxygen) {
-			if (higher >= count - higher)
-				min += treshold;
-			else
-				max -= treshold;
-		}
-		else {
-			if (higher < count - higher)
-				min += treshold;
-			else
-				max -= treshold;
-		}
-
-		treshold >>= 1;
-
-		if (count == 1) {
-			res = last;
-			break;
-		}
-		else if (min == max) {
-			res = max;
-			break;
-		}
+		if (cc == 5 || rc == 5)
+			return true;
 	}
 
-	return res;
+	return false;
+}
+
+static uintmax_t
+score_compute(unsigned char (*grid)[5], unsigned last_number) {
+	assert(grid != NULL);
+	uintmax_t score = 0;
+
+	for (size_t i = 0; i < 5; i++)
+		for (size_t j = 0; j < 5; j++)
+			if (!(grid[i][j] & 0x80))
+				score += grid[i][j];
+
+	return score * last_number;
 }
 
 int
@@ -68,17 +54,114 @@ main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	uint16_t numbers[LINES] = { 0 };
-	char buf[255];
+	char buf[1024];
 
-	for (size_t i = 0; fgets(buf, sizeof buf, fp) != NULL; i++) {
-		for (size_t j = 0; j < NBITS; j++)
-			numbers[i] |= (buf[j] - '0') << (NBITS - j - 1);
+	if (fgets(buf, sizeof buf, fp) == NULL) {
+		perror("fgets");
+		exit(EXIT_FAILURE);
 	}
 
-	uintmax_t oxygen = find_rating(numbers, true);
-	uintmax_t co2 = find_rating(numbers, false);
-	printf("Life support rating: %ju\n", oxygen * co2);
+	struct list *numbers = &(struct list) { .first = NULL };
+	char *pos = buf;
+
+	for (;;) {
+		int offset = 0;
+		char c;
+		unsigned *number = malloc(sizeof *number);
+
+		if (number == NULL) {
+			perror("malloc");
+			exit(EXIT_FAILURE);
+		}
+		if (sscanf(pos, "%u%c%n", number, &c, &offset) != 2) {
+			perror("sscanf");
+			exit(EXIT_FAILURE);
+		}
+
+		if (!list_append(numbers, number)) {
+			perror("list_add");
+			exit(EXIT_FAILURE);
+		}
+		if (c == '\n')
+			break;
+
+		pos += offset;
+	}
+
+	struct list *boards = &(struct list) { .first = NULL };
+
+	for (;;) {
+		unsigned char (*grid)[5] = malloc(sizeof *grid * 5);		
+
+		if (grid == NULL) {
+			perror("malloc");
+			exit(EXIT_FAILURE);
+		}
+
+		if (fscanf(fp,
+		           "%hhu %hhu %hhu %hhu %hhu"
+		           "%hhu %hhu %hhu %hhu %hhu"
+		           "%hhu %hhu %hhu %hhu %hhu"
+		           "%hhu %hhu %hhu %hhu %hhu"
+		           "%hhu %hhu %hhu %hhu %hhu",
+		           &grid[0][0], &grid[0][1], &grid[0][2], &grid[0][3], &grid[0][4],
+		           &grid[1][0], &grid[1][1], &grid[1][2], &grid[1][3], &grid[1][4],
+		           &grid[2][0], &grid[2][1], &grid[2][2], &grid[2][3], &grid[2][4],
+		           &grid[3][0], &grid[3][1], &grid[3][2], &grid[3][3], &grid[3][4],
+		           &grid[4][0], &grid[4][1], &grid[4][2], &grid[4][3], &grid[4][4]
+		          ) != 25) {
+			if (ferror(fp)) {
+				perror("fscanf");
+				exit(EXIT_FAILURE);
+			}
+
+			break;
+		}
+
+		if (!list_append(boards, grid)) {
+			perror("list_append");
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	void *data;
+	unsigned char (*winner)[5];
+	unsigned last_number;
+	unsigned count = 0;
+
+	while ((data = list_pop(numbers)) != NULL) {
+		unsigned number = *(unsigned *)data;
+
+		for (struct node *node = boards->first; node != NULL; node = node->next) {
+			unsigned char (*grid)[5] = node->data;
+
+			if (grid == NULL)
+				continue;
+
+			for (size_t i = 0; i < 5; i++)
+				for (size_t j = 0; j < 5; j++)
+					if (grid[i][j] == number)
+						grid[i][j] |= 0x80;
+
+			if (board_is_winner(grid)) {
+				count++;
+
+				if (count == boards->len) {
+					winner = grid;
+					last_number = number;
+					goto end;
+				}
+
+				free(node->data);
+				node->data = NULL;
+			}
+		}
+	}
+
+	puts("No winner found");
+	return EXIT_FAILURE;
+end:
+	printf("Score: %ju\n", score_compute(winner, last_number));
 	fclose(fp);
 	return 0;
 }
