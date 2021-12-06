@@ -18,14 +18,7 @@ simulate_days(school const begin, uintmax_t days) {
 	for (size_t i = 0; i < days; i++) {
 		school next;
 
-		next[0] = lanternfishes[1];
-		next[1] = lanternfishes[2];
-		next[2] = lanternfishes[3];
-		next[3] = lanternfishes[4];
-		next[4] = lanternfishes[5];
-		next[5] = lanternfishes[6];
-		next[6] = lanternfishes[7];
-		next[7] = lanternfishes[8];
+		memcpy(next, lanternfishes + 1, sizeof next[0] * (SCHOOL_MAX - 1));
 		next[6] += lanternfishes[0];
 		next[8] = lanternfishes[0];
 		memcpy(lanternfishes, next, sizeof (school));
