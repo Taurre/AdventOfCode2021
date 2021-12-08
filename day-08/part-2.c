@@ -72,27 +72,12 @@ main(int argc, char **argv) {
 				patterns[i].segments |= flags[*s - 'a'];
 				patterns[i].len++;
 			}
-
-			switch (patterns[i].len) {
-			case 2:
-				correct[1] = patterns[i];
-				patterns[i].segments = patterns[i].len = 0;
-				break;
-			case 4:
-				correct[4] = patterns[i];
-				patterns[i].segments = patterns[i].len = 0;
-				break;
-			case 3:
-				correct[7] = patterns[i];
-				patterns[i].segments = patterns[i].len = 0;
-				break;
-			case 7:
-				correct[8] = patterns[i];
-				patterns[i].segments = patterns[i].len = 0;
-				break;
-			}
 		}
 
+		correct[1] = pattern_match_mask(patterns, 0, 2);
+		correct[4] = pattern_match_mask(patterns, 0, 4);
+		correct[7] = pattern_match_mask(patterns, 0, 3);
+		correct[8] = pattern_match_mask(patterns, 0, 7);
 		correct[6] = pattern_match_mask(patterns, correct[8].segments ^ correct[7].segments, 6);
 		correct[5] = pattern_match_mask(patterns, correct[6].segments ^ (~correct[4].segments & 0x7F), 5);
 		correct[9] = pattern_match_mask(patterns, correct[4].segments | correct[5].segments, 6);
