@@ -59,28 +59,6 @@ literal_value(struct reader *reader) {
 	}
 }
 
-void
-unlabeled(struct reader *reader) {
-	uint32_t bits = 0;
-
-	if (!read_bits(reader, &bits, 5)) {
-		fprintf(stderr, "Bad unlabeled bits\n");
-		exit(EXIT_FAILURE);
-	}
-}
-
-void
-read_packet(struct reader *reader) {
-	uint32_t bits = 0;
-
-	if (!read_bits(reader, &bits, 3)) {
-		fprintf(stderr, "No packets left\n");
-		return;
-	}
-}
-
-
-
 int
 main(int argc, char **argv) {
 	if (argc <= 1) {
