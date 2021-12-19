@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define LINES 100
+
 enum position {
 	LEFT = 0,
 	RIGHT = 1,
@@ -217,6 +219,46 @@ tree_create_from_line(char const *line) {
 	return current;
 }
 
+static void
+tree_delete(struct node *node) {
+	if (node->left == NULL && node->right == NULL) {
+		free(node);
+		return;
+	}
+
+	tree_delete(node->left);
+	tree_delete(node->right);
+	free(node);
+}
+
+static struct node *
+tree_copy(struct node *node) {
+	struct node *copy = malloc(sizeof *copy);
+
+	if (copy == NULL) {
+		perror("malloc");
+		exit(EXIT_FAILURE);
+	}
+
+	copy->num = node->num;
+
+	if (node->left != NULL) {
+		copy->left = tree_copy(node->left);
+		copy->left->parent = copy;
+	}
+	else
+		copy->left = NULL;
+
+	if (node->right != NULL) {
+		copy->right = tree_copy(node->right);
+		copy->right->parent = copy;
+	}
+	else
+		copy->right = NULL;
+
+	return copy;
+}
+
 static struct node *
 tree_add(struct node *a, struct node *b) {
 	struct node *pair = node_create(NULL);
@@ -249,18 +291,18 @@ tree_reduce(struct node *node) {
 }
 
 static uintmax_t
-magnitude(struct node *node) {
+tree_magnitude(struct node *node) {
 	uintmax_t res = 0;
 
 	if (node->left->left == NULL)
 		res += node->left->num * 3;
 	else
-		res += magnitude(node->left) * 3;
+		res += tree_magnitude(node->left) * 3;
 
 	if (node->right->right == NULL)
 		res += node->right->num * 2;
 	else
-		res += magnitude(node->right) * 2;
+		res += tree_magnitude(node->right) * 2;
 
 	return res;
 }
@@ -280,29 +322,35 @@ main(int argc, char **argv) {
 	}
 
 	char buf[254];
-	struct node *a = NULL;
+	struct node *numbers[LINES];
 
-	while (fgets(buf, sizeof buf, fp) != NULL) {
-		if (a == NULL) {
-			a = tree_create_from_line(buf);
-			continue;
-		}
-
-		struct node *b = tree_create_from_line(buf);
-		struct node *sum = tree_add(a, b);
-		tree_reduce(sum);
-		a = sum;
-	}
+	for (size_t i = 0; fgets(buf, sizeof buf, fp) != NULL; i++)
+		numbers[i] = tree_create_from_line(buf);
 
 	if (ferror(fp)) {
 		perror("fgets");
 		exit(EXIT_FAILURE);
 	}
-	
-	printf("Final sum: ");
-	tree_print(a);
-	putchar('\n');
-	printf("Magnitude: %ju\n", magnitude(a));
+
 	fclose(fp);
+	uintmax_t max = 0;
+
+	for (size_t i = 0; i < LINES; i++) {
+		for (size_t j = 1; j < LINES; j++) {
+			if (i == j)
+				continue;
+
+			struct node *sum = tree_add(tree_copy(numbers[i]), tree_copy(numbers[j]));
+			tree_reduce(sum);
+			uintmax_t magnitude = tree_magnitude(sum);
+
+			if (magnitude > max)
+				max = magnitude; 
+
+			tree_delete(sum);
+		}
+	}
+
+	printf("Biggest magnitude: %ju\n", max);
 	return 0;
 }
